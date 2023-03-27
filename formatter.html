@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DF Direct Timecode Formatter</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        #inputDiv {
+            width: 600px;
+            height: 300px;
+            border: 1px solid black;
+		background: white;
+            padding: 10px;
+        }
+        #outputText {
+            width: 600px;
+            height: 300px;
+            border: 1px solid black;
+            padding: 10px;
+        }
+	body,html {height:100%;overflow:hidden;}
+	body {
+  		width: 100%;
+  		height: 100%;
+  		position: absolute;
+  		background: linear-gradient(to bottom, #6e529d 0%,#d97b93 100%);
+	}
+    </style>
+</head>
+<body>
+    <h2 style="color:white;">DF Direct Timecode Formatter</h2>
+    <p style="color:white;">Paste timecode text below, then press the button. </p>
+    <div id="inputDiv" contenteditable="true"></div><br><br>
+    <button onclick="removeSpanTags()">Remove span tags and attributes</button><br><br>
+    <textarea id="outputText"></textarea>
+
+    <script>
+        function removeSpanTags() {
+            var myText = document.getElementById("inputDiv").innerHTML;
+            var div = document.createElement("div");
+            div.innerHTML = myText;
+            var spans = div.getElementsByTagName("span");
+            for (var i = spans.length - 1; i >= 0; i--) {
+                spans[i].parentNode.replaceChild(spans[i].firstChild, spans[i]);
+            }
+            var links = div.getElementsByTagName("a");
+            for (var i = links.length - 1; i >= 0; i--) {
+                var href = links[i].getAttribute("href");
+                links[i].outerHTML = "<a href='" + href + "'>" + links[i].innerHTML + "</a>";
+            }
+            var output = document.createElement('ul');
+            output.innerHTML = div.innerHTML.split('\n').map(function(line) { return '<li>' + line.trim() + '</li>'; }).join('\n');
+            document.getElementById('outputText').value = output.outerHTML;
+        }
+    </script>
+</body>
+</html>
