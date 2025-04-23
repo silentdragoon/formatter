@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reformat Headset Entry</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: linear-gradient(
+          135deg,
+          #6a11cb,
+          #2575fc
+        ); /* Purple gradient background */
+        color: white;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4caf50; /* Green button background */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049; /* Hover effect for button */
+      }
+      #output-container {
+        margin-top: 20px;
+        background-color: rgba(
+          255,
+          255,
+          255,
+          0.1
+        ); /* Semi-transparent white background for output */
+        padding: 10px;
+        border-radius: 5px;
+      }
+      #output {
+        white-space: pre-wrap;
+        color: white; /* Ensure text remains white inside the output */
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Headset Entry Reformatter</h1>
+    <p>Paste your old-style headset entry below:</p>
+    <textarea id="input" placeholder="Paste old-style HTML here..."></textarea>
+    <button onclick="reformatEntry()">Reformat</button>
+    <div id="output-container">
+      <button onclick="copyToClipboard()">Copy to Clipboard</button>
+      <h2>Reformatted Entry:</h2>
+      <div id="output"></div>
+    </div>
+
+    <script>
+      function copyToClipboard() {
+        const output = document.getElementById("output").textContent;
+
+        // Check if there's any content to copy
+        if (!output.trim()) {
+          alert(
+            "No content available to copy. Please reformat an entry first."
+          );
+          return;
+        }
+
+        navigator.clipboard
+          .writeText(output)
+          .then(() => {
+            alert("Reformatted HTML copied to clipboard!");
+          })
+          .catch((err) => {
+            alert("Failed to copy text: " + err);
+          });
+      }
+
+      function reformatEntry() {
+        const input = document.getElementById("input").value;
+
+        // Initialize an array for error messages
+        let errors = [];
+
+        // Match and validate each section of the input
+        const titleMatch = input.match(/<h2 id=".*?">(.*?)<\/h2>/);
+        if (!titleMatch)
+          errors.push(
+            "Missing or invalid title (e.g., <h2 id='...'>Title</h2>)."
+          );
+
+        const subtitleMatch = input.match(/<p>(.*?)<\/p>/);
+        if (!subtitleMatch)
+          errors.push(
+            "Missing or invalid subtitle (e.g., <p>Subtitle text</p>)."
+          );
+
+        const imgMatch = input.match(/<img id="(.*?)" hint="(.*?)" \/>/);
+        if (!imgMatch)
+          errors.push(
+            "Missing or invalid image tag with id and hint attributes (e.g., <img id='...' hint='...' />)."
+          );
+
+        const descriptionMatches = input.match(/<p>(.*?)<\/p>/gs);
+        if (!descriptionMatches || descriptionMatches.length < 2) {
+          errors.push(
+            "Missing or insufficient description paragraphs (<p>Description...</p>)."
+          );
+        }
+
+        const buyLinksMatch = input.match(/<ul>(.*?)<\/ul>/s);
+        if (!buyLinksMatch)
+          errors.push("Missing or invalid buy links list (<ul>...</ul>).");
+
+        // Check if there are any errors
+        if (errors.length > 0) {
+          document.getElementById("output").textContent =
+            "Error: Your input doesn't match the expected format.\n\n" +
+            errors.join("\n");
+          return;
+        }
+
+        const title = titleMatch[1];
+        const subtitle = subtitleMatch[1];
+        const imgId = imgMatch[1]; // Capture the id attribute
+        const imgHint = imgMatch[2]; // Capture the hint attribute
+        const buyLinks = buyLinksMatch[1];
+
+        // Combine all <p> tags into one block for the description
+        const description = descriptionMatches.slice(1).join("\n\n");
+
+        // Create reformatted entry
+        const reformattedEntry = `
+    <hr />
+    <table>
+    <tr>
+    <td>
+    <h2>${title}</h2>
+    <p><em>${subtitle}</em></p>
+    </td>
+    <td>
+    <ul>
+    ${buyLinks}
+    </ul>
+    </td>
+    </tr>
+    </table>
+    <figure>
+    <img id="${imgId}" hint="${imgHint}" />
+    <figcaption></figcaption>
+    </figure>
+    
+    ${description}
+                `.trim();
+
+        // Remove indentation for readability and add breaks between lines
+        const formattedOutput = reformattedEntry.split("\n").join("\n");
+
+        // Display the reformatted entry
+        document.getElementById("output").textContent = formattedOutput;
+      }
+    </script>
+  </body>
+</html>
