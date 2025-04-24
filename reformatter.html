@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Reformat Headset Entry</title>
+    <title>Reformat DF Guide Entry</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -54,8 +54,8 @@
     </style>
   </head>
   <body>
-    <h1>Headset Entry Reformatter</h1>
-    <p>Paste your old-style headset entry below:</p>
+    <h1>DF Guide Entry Reformatter</h1>
+    <p>Paste your old-style guide entry below:</p>
     <textarea id="input" placeholder="Paste old-style HTML here..."></textarea>
     <button onclick="reformatEntry()">Reformat</button>
     <div id="output-container">
@@ -85,55 +85,41 @@
             alert("Failed to copy text: " + err);
           });
       }
-
-      function reformatEntry() {
+    function reformatEntry() {
         const input = document.getElementById("input").value;
 
         // Initialize an array for error messages
         let errors = [];
 
         // Match and validate each section of the input
-        const titleMatch = input.match(/<h2 id=".*?">(.*?)<\/h2>/);
-        if (!titleMatch)
-          errors.push(
-            "Missing or invalid title (e.g., <h2 id='...'>Title</h2>)."
-          );
+        const titleMatch = input.match(/<h2 id="(.*?)">(.*?)<\/h2>/);
+        if (!titleMatch) errors.push("Missing or invalid title with id attribute (e.g., <h2 id='...'>Title</h2>).");
 
         const subtitleMatch = input.match(/<p>(.*?)<\/p>/);
-        if (!subtitleMatch)
-          errors.push(
-            "Missing or invalid subtitle (e.g., <p>Subtitle text</p>)."
-          );
+        if (!subtitleMatch) errors.push("Missing or invalid subtitle (e.g., <p>Subtitle text</p>).");
 
         const imgMatch = input.match(/<img id="(.*?)" hint="(.*?)" \/>/);
-        if (!imgMatch)
-          errors.push(
-            "Missing or invalid image tag with id and hint attributes (e.g., <img id='...' hint='...' />)."
-          );
+        if (!imgMatch) errors.push("Missing or invalid image tag with id and hint attributes (e.g., <img id='...' hint='...' />).");
 
         const descriptionMatches = input.match(/<p>(.*?)<\/p>/gs);
         if (!descriptionMatches || descriptionMatches.length < 2) {
-          errors.push(
-            "Missing or insufficient description paragraphs (<p>Description...</p>)."
-          );
+            errors.push("Missing or insufficient description paragraphs (<p>Description...</p>).");
         }
 
         const buyLinksMatch = input.match(/<ul>(.*?)<\/ul>/s);
-        if (!buyLinksMatch)
-          errors.push("Missing or invalid buy links list (<ul>...</ul>).");
+        if (!buyLinksMatch) errors.push("Missing or invalid buy links list (<ul>...</ul>).");
 
         // Check if there are any errors
         if (errors.length > 0) {
-          document.getElementById("output").textContent =
-            "Error: Your input doesn't match the expected format.\n\n" +
-            errors.join("\n");
-          return;
+            document.getElementById("output").textContent = "Error: Your input doesn't match the expected format.\n\n" + errors.join("\n");
+            return;
         }
 
-        const title = titleMatch[1];
+        const h2Id = titleMatch[1]; // Capture the id attribute for h2
+        const title = titleMatch[2]; // Capture the title text
         const subtitle = subtitleMatch[1];
-        const imgId = imgMatch[1]; // Capture the id attribute
-        const imgHint = imgMatch[2]; // Capture the hint attribute
+        const imgId = imgMatch[1]; // Capture the id attribute for img
+        const imgHint = imgMatch[2]; // Capture the hint attribute for img
         const buyLinks = buyLinksMatch[1];
 
         // Combine all <p> tags into one block for the description
@@ -141,34 +127,50 @@
 
         // Create reformatted entry
         const reformattedEntry = `
-    <hr />
-    <table>
-    <tr>
-    <td>
-    <h2>${title}</h2>
-    <p><em>${subtitle}</em></p>
-    </td>
-    <td>
-    <ul>
-    ${buyLinks}
-    </ul>
-    </td>
-    </tr>
-    </table>
-    <figure>
-    <img id="${imgId}" hint="${imgHint}" />
-    <figcaption></figcaption>
-    </figure>
-    
-    ${description}
-                `.trim();
+<hr />
+<table>
+<tr>
+<td>
+<h2 id="${h2Id}">${title}</h2>
+<p><em>${subtitle}</em></p>
+</td>
+<td>
+<ul>
+${buyLinks}
+</ul>
+</td>
+</tr>
+</table>
+<figure>
+<img id="${imgId}" hint="${imgHint}" />
+<figcaption></figcaption>
+</figure>
+
+${description}
+            `.trim();
 
         // Remove indentation for readability and add breaks between lines
         const formattedOutput = reformattedEntry.split("\n").join("\n");
 
         // Display the reformatted entry
         document.getElementById("output").textContent = formattedOutput;
-      }
-    </script>
+    }
+
+    function copyToClipboard() {
+        const output = document.getElementById("output").textContent;
+
+        // Check if there's any content to copy
+        if (!output.trim()) {
+            alert("No content available to copy. Please reformat an entry first.");
+            return;
+        }
+
+        navigator.clipboard.writeText(output).then(() => {
+            alert("Reformatted HTML copied to clipboard!");
+        }).catch((err) => {
+            alert("Failed to copy text: " + err);
+        });
+    }
+</script>
   </body>
 </html>
