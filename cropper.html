@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>16:9 Transparent PNG Cropper</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 2px dashed #ccc;
+            margin-top: 20px;
+            background-image: 
+                linear-gradient(45deg, #eee 25%, transparent 25%), 
+                linear-gradient(-45deg, #eee 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #eee 75%), 
+                linear-gradient(-45deg, transparent 75%, #eee 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            background-color: #007bff;
+            color: white;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .secondary { background-color: #28a745; }
+        .secondary:hover { background-color: #218838; }
+        #status { margin-top: 10px; font-size: 14px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>16:9 Content Cropper</h2>
+    <p>Upload a transparent PNG. We'll trim the excess and pad it to 16:9.</p>
+    
+    <div class="controls">
+        <input type="file" id="upload" accept="image/png" hidden>
+        <button onclick="document.getElementById('upload').click()">Upload PNG</button>
+        <button id="downloadBtn" class="secondary" disabled>Save Image</button>
+        <button id="copyBtn" class="secondary" disabled>Copy to Clipboard</button>
+    </div>
+
+    <div id="status">No image loaded</div>
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+    const upload = document.getElementById('upload');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { alpha: true });
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const status = document.getElementById('status');
+
+    let processedBlob = null;
+
+    upload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => processImage(img);
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function processImage(img) {
+        // 1. Create a temporary canvas to find content bounds
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        tempCtx.drawImage(img, 0, 0);
+
+        const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+        const data = imageData.data;
+
+        // 2. Scan for the bounding box of non-transparent pixels
+        let minX = img.width, minY = img.height, maxX = 0, maxY = 0;
+        let foundContent = false;
+
+        for (let y = 0; y < img.height; y++) {
+            for (let x = 0; x < img.width; x++) {
+                const alpha = data[(y * img.width + x) * 4 + 3];
+                if (alpha > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    foundContent = true;
+                }
+            }
+        }
+
+        if (!foundContent) {
+            status.innerText = "Error: Image appears to be fully transparent.";
+            return;
+        }
+
+        // 3. Calculate content dimensions
+        const contentW = (maxX - minX) + 1;
+        const contentH = (maxY - minY) + 1;
+        
+        // 4. Calculate 16:9 dimensions based on content
+        const targetRatio = 16 / 9;
+        const contentRatio = contentW / contentH;
+
+        let finalW, finalH;
+
+        if (contentRatio > targetRatio) {
+            // Content is wider than 16:9, pad the top/bottom
+            finalW = contentW;
+            finalH = contentW / targetRatio;
+        } else {
+            // Content is taller than 16:9, pad the sides
+            finalH = contentH;
+            finalW = contentH * targetRatio;
+        }
+
+        // 5. Draw the result
+        canvas.width = finalW;
+        canvas.height = finalH;
+        ctx.clearRect(0, 0, finalW, finalH);
+
+        // Center the cropped content onto the 16:9 canvas
+        const offsetX = (finalW - contentW) / 2;
+        const offsetY = (finalH - contentH) / 2;
+
+        ctx.drawImage(
+            img, 
+            minX, minY, contentW, contentH, // Source (the trimmed box)
+            offsetX, offsetY, contentW, contentH // Destination (centered)
+        );
+
+        // 6. Enable export buttons
+        canvas.toBlob((blob) => {
+            processedBlob = blob;
+            downloadBtn.disabled = false;
+            copyBtn.disabled = false;
+            status.innerText = `Processed to ${Math.round(finalW)}x${Math.round(finalH)} (16:9)`;
+        }, 'image/png');
+    }
+
+    // Download functionality
+    downloadBtn.addEventListener('click', () => {
+        if (!processedBlob) return;
+        const url = URL.createObjectURL(processedBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'cropped_16x9.png';
+        link.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Clipboard functionality
+    copyBtn.addEventListener('click', async () => {
+        if (!processedBlob) return;
+        try {
+            const data = [new ClipboardItem({ 'image/png': processedBlob })];
+            await navigator.clipboard.write(data);
+            alert('Image copied to clipboard!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to copy. Your browser might not support clipboard image writing.');
+        }
+    });
+</script>
+
+</body>
+</html>
