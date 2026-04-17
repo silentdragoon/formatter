@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Product Cropper Pro + Scaling</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <style>
+        :root { --primary: #6366f1; --success: #22c55e; --bg: #f8fafc; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 2rem; }
+        .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 1100px; text-align: center; }
+        .controls { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center; }
+        .group { display: flex; align-items: center; gap: 0.5rem; background: #f1f5f9; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 14px; font-weight: 500; }
+        canvas { max-width: 100%; height: auto; border-radius: 0.5rem; border: 2px solid #e2e8f0; margin-top: 1rem; 
+            background-image: repeating-conic-gradient(#f1f5f9 0% 25%, white 0% 50%) ; background-size: 20px 20px; }
+        button { padding: 0.6rem 1.2rem; border-radius: 0.5rem; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; background: var(--primary); color: white; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .btn-save { background: var(--success); }
+        select, input[type="checkbox"] { cursor: pointer; }
+        #status { font-size: 0.875rem; color: #64748b; margin-top: 0.5rem; min-height: 1.2em; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>AI Product Cropper Pro</h2>
+    <p>16:9 Smart Crop • High-Res Prevention • PNG/JPG Export</p>
+
+    <div class="controls">
+        <input type="file" id="upload" accept="image/*" hidden>
+        <button onclick="document.getElementById('upload').click()">1. Upload</button>
+        
+        <div class="group">
+            <label>Buffer:</label>
+            <input type="range" id="paddingSlider" min="0" max="100" value="15">
+            <span id="paddingVal">15%</span>
+        </div>
+
+        <div class="group">
+            <input type="checkbox" id="scaleCheck" checked>
+            <label for="scaleCheck">Downscale to 1080p</label>
+        </div>
+
+        <button id="aiBtn" disabled>2. AI Crop</button>
+
+        <div class="group">
+            <label>Format:</label>
+            <select id="formatSelect">
+                <option value="image/png">PNG (Lossless)</option>
+                <option value="image/jpeg">JPG (Max Quality)</option>
+            </select>
+        </div>
+
+        <button id="downloadBtn" class="btn-save" disabled>3. Save</button>
+        <button id="copyBtn" class="btn-save" disabled>Copy</button>
+    </div>
+
+    <div id="status">Ready</div>
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+    const upload = document.getElementById('upload');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const aiBtn = document.getElementById('aiBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const status = document.getElementById('status');
+    const paddingSlider = document.getElementById('paddingSlider');
+    const paddingVal = document.getElementById('paddingVal');
+    const formatSelect = document.getElementById('formatSelect');
+    const scaleCheck = document.getElementById('scaleCheck');
+
+    let originalImg = null;
+    let model = null;
+
+    (async () => {
+        status.innerText = "Loading AI Intelligence...";
+        model = await cocoSsd.load();
+        status.innerText = "AI Ready.";
+    })();
+
+    paddingSlider.oninput = () => paddingVal.innerText = paddingSlider.value + "%";
+
+    upload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            originalImg = new Image();
+            originalImg.onload = () => {
+                canvas.width = originalImg.width;
+                canvas.height = originalImg.height;
+                ctx.drawImage(originalImg, 0, 0);
+                aiBtn.disabled = false;
+                status.innerText = `Image loaded (${originalImg.width}x${originalImg.height})`;
+            };
+            originalImg.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    aiBtn.addEventListener('click', async () => {
+        if (!model || !originalImg) return;
+        status.innerText = "Finding your product...";
+        const predictions = await model.detect(originalImg);
+        
+        // Strategy: Focus on the largest object detected
+        let targetBox = predictions.length > 0 
+            ? predictions.reduce((p, c) => (p.bbox[2]*p.bbox[3] > c.bbox[2]*c.bbox[3]) ? p : c).bbox 
+            : [0, 0, originalImg.width, originalImg.height];
+
+        const [x, y, w, h] = targetBox;
+        const paddingPct = parseInt(paddingSlider.value) / 100;
+        const pad = Math.max(w, h) * paddingPct;
+        
+        let cropW = w + (pad * 2);
+        let cropH = cropW / (16/9);
+
+        // Ensure vertical space is also covered
+        if (cropH < h + (pad * 2)) {
+            cropH = h + (pad * 2);
+            cropW = cropH * (16/9);
+        }
+
+        // Clamp to photo edges
+        if (cropW > originalImg.width) { cropW = originalImg.width; cropH = cropW / (16/9); }
+        if (cropH > originalImg.height) { cropH = originalImg.height; cropW = cropH * (16/9); }
+
+        let startX = Math.max(0, Math.min(originalImg.width - cropW, (x + w/2) - (cropW / 2)));
+        let startY = Math.max(0, Math.min(originalImg.height - cropH, (y + h/2) - (cropH / 2)));
+
+        // --- NEW SCALING LOGIC ---
+        let renderW = cropW;
+        let renderH = cropH;
+
+        if (scaleCheck.checked && cropW > 1920) {
+            renderW = 1920;
+            renderH = 1080;
+            status.innerText = `Cropped & Downscaled to 1080p.`;
+        } else {
+            status.innerText = `Cropped to ${Math.round(cropW)}x${Math.round(cropH)}.`;
+        }
+
+        canvas.width = renderW;
+        canvas.height = renderH;
+        
+        // Draw with scaling
+        ctx.drawImage(
+            originalImg, 
+            startX, startY, cropW, cropH, // Source
+            0, 0, renderW, renderH        // Destination (scaled)
+        );
+
+        downloadBtn.disabled = false;
+        copyBtn.disabled = false;
+    });
+
+    function getProcessedBlob(callback) {
+        const format = formatSelect.value;
+        const quality = 1.0; 
+
+        if (format === 'image/jpeg') {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.fillStyle = '#FFFFFF';
+            tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tCtx.drawImage(canvas, 0, 0);
+            tempCanvas.toBlob(callback, format, quality);
+        } else {
+            canvas.toBlob(callback, format);
+        }
+    }
+
+    downloadBtn.addEventListener('click', () => {
+        getProcessedBlob(blob => {
+            const ext = formatSelect.value === 'image/jpeg' ? 'jpg' : 'png';
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `product_16x9.${ext}`;
+            link.click();
+        });
+    });
+
+    copyBtn.addEventListener('click', async () => {
+        getProcessedBlob(async (blob) => {
+            try {
+                const data = [new ClipboardItem({ [blob.type]: blob })];
+                await navigator.clipboard.write(data);
+                alert('Copied to clipboard!');
+            } catch (e) { 
+                alert('Copy failed. Try saving the file.'); 
+            }
+        });
+    });
+</script>
+</body>
+</html>
