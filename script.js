@@ -88,7 +88,27 @@ async function fetchDFVideos(yearsAgo, elementId, baseDate) {
         return;
     }
 
-    // Cache successful response
+    // Enrich items with view counts
+    const videoIds = data.items.map(v => v.id.videoId).join(',');
+    if (videoIds) {
+        const statsUrl = `https://www.googleapis.com/youtube/v3/videos?key=${API_KEY}&id=${videoIds}&part=statistics`;
+        const statsData = await fetch(statsUrl).then(r => r.json());
+        const statsMap = {};
+        if (statsData.items) {
+            statsData.items.forEach(s => {
+                statsMap[s.id] = s.statistics;
+            });
+        }
+        // Merge viewCount into each video item
+        data.items = data.items.map(v => {
+            const stats = statsMap[v.id.videoId] || {};
+            return { ...v, viewCount: parseInt(stats.viewCount || '0', 10) };
+        });
+        // Sort by viewCount descending
+        data.items.sort((a, b) => b.viewCount - a.viewCount);
+    }
+
+    // Cache successful response with enriched and sorted items
     const cacheEntry = {
         timestamp: Date.now(),
         items: data.items
@@ -115,6 +135,7 @@ function displayVideos(videos, elementId) {
                 <img src="${v.snippet.thumbnails.medium.url}" alt="thumbnail">
                 <h3>${v.snippet.title}</h3>
                 <p>${new Date(v.snippet.publishedAt).toLocaleDateString()}</p>
+                <p class="view-count">Views: ${v.viewCount?.toLocaleString() || '0'}</p>
             </a>
         </div>
     `).join('');
