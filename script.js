@@ -1,4 +1,12 @@
-const API_KEY = 'AIzaSyAWihABkwxCb1SY5zkgkOvx_NlUg32NIWw';
+let API_KEY = localStorage.getItem('ytApiKey');
+if (!API_KEY) {
+    API_KEY = prompt('Enter your YouTube Data API key:');
+    if (API_KEY) {
+        localStorage.setItem('ytApiKey', API_KEY);
+    } else {
+        alert('You must provide an API key to use this application.');
+    }
+}
 const pendingRequests = {};
 
 // Purge stale cached video data (older than 24 hours) to prevent storage bloat
