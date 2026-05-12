@@ -2,32 +2,49 @@ const API_KEY = 'AIzaSyAWihABkwxCb1SY5zkgkOvx_NlUg32NIWw';
 const DF_CHANNEL_ID = 'UC9PBzalIcEQCsiIkq36PyUA';
 
 async function fetchDFVideos(yearsAgo, elementId) {
-    const today = new Date("2026-05-12"); // Hardcoded to current simulated date
-    const targetDate = new Date(today.setFullYear(today.getFullYear() - yearsAgo));
+    // 1. Get the actual "now"
+    const now = new Date(); 
     
-    // Set +/- 2 week range
-    const after = new Date(targetDate.getTime() - (14 * 24 * 60 * 60 * 1000)).toISOString();
-    const before = new Date(targetDate.getTime() + (14 * 24 * 60 * 60 * 1000)).toISOString();
+    // 2. Create a target date by subtracting the years
+    const targetDate = new Date();
+    targetDate.setFullYear(now.getFullYear() - yearsAgo);
+    
+    // 3. Define the +/- 14 day window (in milliseconds)
+    const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
+    const publishedAfter = new Date(targetDate.getTime() - twoWeeksInMs).toISOString();
+    const publishedBefore = new Date(targetDate.getTime() + twoWeeksInMs).toISOString();
 
-    const url = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${DF_CHANNEL_ID}&part=snippet,id&order=date&maxResults=10&publishedAfter=${after}&publishedBefore=${before}&type=video`;
+    const url = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${DF_CHANNEL_ID}&part=snippet,id&order=date&maxResults=10&publishedAfter=${publishedAfter}&publishedBefore=${publishedBefore}&type=video`;
 
     try {
         const response = await fetch(url);
         const data = await response.json();
+        
+        // Handle potential API errors (like quota limits)
+        if (data.error) {
+            console.error("API Error:", data.error.message);
+            return;
+        }
+        
         displayVideos(data.items, elementId);
     } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Network or Fetch Error:", error);
     }
 }
 
 function displayVideos(videos, elementId) {
     const container = document.getElementById(elementId);
+    if (!videos || videos.length === 0) {
+        container.innerHTML = "<p>No videos found for this period.</p>";
+        return;
+    }
+    
     container.innerHTML = videos.map(v => `
         <div class="video-card">
             <a href="https://www.youtube.com/watch?v=${v.id.videoId}" target="_blank">
                 <img src="${v.snippet.thumbnails.medium.url}" alt="thumbnail">
                 <h3>${v.snippet.title}</h3>
-                <p>${new Date(v.snippet.publishedAt).toDateString()}</p>
+                <p>${new Date(v.snippet.publishedAt).toLocaleDateString()}</p>
             </a>
         </div>
     `).join('');
