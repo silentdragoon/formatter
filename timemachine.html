@@ -7,10 +7,14 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>Digital Foundry <span class="highlight">Time Machine</span></h1>
-        <p>Browsing videos from this week in history.</p>
-    </header>
+<header>
+    <h1>Digital Foundry <span class="highlight">Time Machine</span></h1>
+    <div class="controls">
+        <label for="base-date">Travel to date:</label>
+        <input type="date" id="base-date">
+        <button id="update-btn">Warp</button>
+    </div>
+</header>
 
     <main id="app">
         <section class="time-block" id="one-year">
