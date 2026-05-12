@@ -1,41 +1,38 @@
 const API_KEY = 'AIzaSyAWihABkwxCb1SY5zkgkOvx_NlUg32NIWw';
 const DF_CHANNEL_ID = 'UC9PBzalIcEQCsiIkq36PyUA';
 
-async function fetchDFVideos(yearsAgo, elementId) {
-    // 1. Get the actual "now"
-    const now = new Date(); 
+const datePicker = document.getElementById('base-date');
+const updateBtn = document.getElementById('update-btn');
+
+// Set the date picker to today's date by default
+datePicker.valueAsDate = new Date();
+
+async function fetchDFVideos(yearsAgo, elementId, baseDate) {
+    const targetDate = new Date(baseDate);
+    targetDate.setFullYear(targetDate.getFullYear() - yearsAgo);
     
-    // 2. Create a target date by subtracting the years
-    const targetDate = new Date();
-    targetDate.setFullYear(now.getFullYear() - yearsAgo);
-    
-    // 3. Define the +/- 14 day window (in milliseconds)
     const twoWeeksInMs = 14 * 24 * 60 * 60 * 1000;
     const publishedAfter = new Date(targetDate.getTime() - twoWeeksInMs).toISOString();
     const publishedBefore = new Date(targetDate.getTime() + twoWeeksInMs).toISOString();
 
     const url = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${DF_CHANNEL_ID}&part=snippet,id&order=date&maxResults=10&publishedAfter=${publishedAfter}&publishedBefore=${publishedBefore}&type=video`;
 
+    const container = document.getElementById(elementId);
+    container.innerHTML = "<p>Loading history...</p>";
+
     try {
         const response = await fetch(url);
         const data = await response.json();
-        
-        // Handle potential API errors (like quota limits)
-        if (data.error) {
-            console.error("API Error:", data.error.message);
-            return;
-        }
-        
         displayVideos(data.items, elementId);
     } catch (error) {
-        console.error("Network or Fetch Error:", error);
+        container.innerHTML = "<p>Error loading videos.</p>";
     }
 }
 
 function displayVideos(videos, elementId) {
     const container = document.getElementById(elementId);
     if (!videos || videos.length === 0) {
-        container.innerHTML = "<p>No videos found for this period.</p>";
+        container.innerHTML = "<p>No videos found for this window.</p>";
         return;
     }
     
@@ -50,7 +47,20 @@ function displayVideos(videos, elementId) {
     `).join('');
 }
 
-// Initialize
-fetchDFVideos(1, 'grid-1');
-fetchDFVideos(5, 'grid-5');
-fetchDFVideos(10, 'grid-10');
+// Master function to refresh all sections
+function updateAllGrids() {
+    const selectedDate = new Date(datePicker.value);
+    
+    // Validate date
+    if (isNaN(selectedDate.getTime())) return;
+
+    fetchDFVideos(1, 'grid-1', selectedDate);
+    fetchDFVideos(5, 'grid-5', selectedDate);
+    fetchDFVideos(10, 'grid-10', selectedDate);
+}
+
+// Listen for button click
+updateBtn.addEventListener('click', updateAllGrids);
+
+// Initial load
+updateAllGrids();
