@@ -83,8 +83,24 @@ async function fetchDFVideos(yearsAgo, elementId, baseDate) {
             return;
         }
     }
-    // Initiate fetch and store promise
-    const fetchPromise = fetch(url).then(r => r.json());
+    
+    // Initiate fetch with retry logic to handle intermittent API errors
+    const fetchWithRetry = async (url, retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+            const response = await fetch(url, { credentials: 'omit' });
+            const result = await response.json();
+            
+            // If the specific intermittent error occurs, wait and retry
+            if (result.error && result.error.message && result.error.message.includes('The authenticated user cannot act on behalf')) {
+                await new Promise(r => setTimeout(r, 1000 * (i + 1))); // Exponential backoff
+                continue;
+            }
+            return result;
+        }
+        return fetch(url, { credentials: 'omit' }).then(r => r.json());
+    };
+
+    const fetchPromise = fetchWithRetry(url);
     pendingRequests[cacheKey] = fetchPromise;
     const data = await fetchPromise;
     // Clean up pending request entry
@@ -149,16 +165,17 @@ function displayVideos(videos, elementId) {
     `).join('');
 }
 
-// Master function to refresh all sections
-function updateAllGrids() {
+// Master function to refresh all sections sequentially to prevent API rate limits/errors
+async function updateAllGrids() {
     const selectedDate = new Date(datePicker.value);
 
     // Validate date
     if (isNaN(selectedDate.getTime())) return;
 
-    fetchDFVideos(1, 'grid-1', selectedDate);
-    fetchDFVideos(5, 'grid-5', selectedDate);
-    fetchDFVideos(10, 'grid-10', selectedDate);
+    // Await them sequentially to avoid burst-request intermittent 403s
+    await fetchDFVideos(1, 'grid-1', selectedDate);
+    await fetchDFVideos(5, 'grid-5', selectedDate);
+    await fetchDFVideos(10, 'grid-10', selectedDate);
 }
 
 // Listen for button click
